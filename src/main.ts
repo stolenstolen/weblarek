@@ -30,14 +30,25 @@ basketModel.clear();
 console.log('Корзина после очистки:', basketModel.getItems());
 
 const buyerModel = new Buyer();
+console.log('Данные покупателя при загрузке:', buyerModel.getData());
+console.log('Ошибки валидации пустых данных:', buyerModel.validate());
+
 buyerModel.setPayment('card');
+console.log('Ошибки после выбора оплаты:', buyerModel.validate());
+
 buyerModel.setAddress('Москва');
+console.log('Ошибки после указания адреса:', buyerModel.validate());
+
 buyerModel.setEmail('buyer@example.com');
+console.log('Ошибки после указания емэйла:', buyerModel.validate());
+
 buyerModel.setPhone('+79990000000');
 console.log('Данные покупателя:', buyerModel.getData());
-console.log('Ошибки валидации покупателя:', buyerModel.validate());
+console.log('Ошибки валидации заполненных данных:', buyerModel.validate());
+
 buyerModel.clear();
 console.log('Данные покупателя после очистки:', buyerModel.getData());
+console.log('Ошибки валидации после очистки:', buyerModel.validate());
 
 const webLarekApi = new LarekApi(new Api(API_URL));
 webLarekApi.getProducts()

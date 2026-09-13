@@ -3,18 +3,28 @@ import { IBuyer, TPayment } from '../types';
 export type BuyerErrors = Partial<Record<keyof IBuyer, string>>;
 
 export class Buyer {
-    private data: Partial<IBuyer> = {};
+    private data: IBuyer = {
+        payment: null,
+        email: '',
+        phone: '',
+        address: '',
+    };
 
     setData(data: Partial<IBuyer>): void {
         this.data = { ...this.data, ...data };
     }
 
-    getData(): Partial<IBuyer> {
+    getData(): IBuyer {
         return this.data;
     }
 
     clear(): void {
-        this.data = {};
+        this.data = {
+            payment: null,
+            email: '',
+            phone: '',
+            address: '',
+        };
     }
 
     validate(): BuyerErrors {

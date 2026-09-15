@@ -17,12 +17,7 @@ export abstract class FormBase<T extends Record<string, string | null>> extends 
         this.errorsElement.classList.toggle('form__errors_active', messages.length > 0);
     }
 
-    protected updateSubmitState(isValid: boolean): void {
+    public setValid(isValid: boolean): void {
         this.submitButton.disabled = !isValid;
-    }
-
-    protected clearErrors(): void {
-        this.errorsElement.textContent = '';
-        this.errorsElement.classList.remove('form__errors_active');
     }
 }

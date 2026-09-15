@@ -1,8 +1,9 @@
 import { IBuyer, TPayment } from '../types';
+import { EventEmitter } from './base/Events';
 
 export type BuyerErrors = Partial<Record<keyof IBuyer, string>>;
 
-export class Buyer {
+export class Buyer extends EventEmitter {
     private data: IBuyer = {
         payment: null,
         email: '',
@@ -10,8 +11,13 @@ export class Buyer {
         address: '',
     };
 
+    private emitChange(): void {
+        this.emit('buyer:changed', { data: this.data });
+    }
+
     setData(data: Partial<IBuyer>): void {
         this.data = { ...this.data, ...data };
+        this.emitChange();
     }
 
     getData(): IBuyer {
@@ -25,6 +31,7 @@ export class Buyer {
             phone: '',
             address: '',
         };
+        this.emitChange();
     }
 
     validate(): BuyerErrors {

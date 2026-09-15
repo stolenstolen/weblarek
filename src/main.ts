@@ -7,53 +7,139 @@ import { LarekApi } from './components/LarekApi';
 import { Products } from './components/Products';
 import { IProduct } from './types';
 import { API_URL } from './utils/constants';
-import { apiProducts } from './utils/data';
+import { cloneTemplate, ensureElement } from './utils/utils';
+import { GalleryView } from './components/view/GalleryView';
+import { ModalView } from './components/view/ModalView';
+import { BasketView } from './components/view/BasketView';
+import { CardPreview } from './components/view/CardPreview';
+import { OrderForm } from './components/view/OrderForm';
+import { ContactsForm } from './components/view/ContactsForm';
 
 const productsModel = new Products();
-productsModel.setItems(apiProducts.items);
-console.log('Массив товаров из каталога:', productsModel.getItems());
-console.log('Товар по id:', productsModel.getItem(apiProducts.items[0].id));
-productsModel.setSelected(apiProducts.items[0]);
-console.log('Товар для подробного отображения:', productsModel.getSelected());
-
 const basketModel = new Basket();
-const firstProduct: IProduct = apiProducts.items[0];
-basketModel.addItem(firstProduct);
-console.log('Товары в корзине:', basketModel.getItems());
-console.log('Товар есть в корзине:', basketModel.hasItem(firstProduct.id));
-console.log('Количество товаров:', basketModel.getCount());
-console.log('Стоимость товаров:', basketModel.getTotalPrice());
-basketModel.removeItem(firstProduct);
-console.log('Корзина после удаления:', basketModel.getItems());
-basketModel.addItem(firstProduct);
-basketModel.clear();
-console.log('Корзина после очистки:', basketModel.getItems());
-
 const buyerModel = new Buyer();
-console.log('Данные покупателя при загрузке:', buyerModel.getData());
-console.log('Ошибки валидации пустых данных:', buyerModel.validate());
+const api = new LarekApi(new Api(API_URL));
 
-buyerModel.setPayment('card');
-console.log('Ошибки после выбора оплаты:', buyerModel.validate());
+const basketCounter = ensureElement<HTMLElement>('.header__basket-counter');
+const basketButton = ensureElement<HTMLButtonElement>('.header__basket');
+const modalView = new ModalView();
+const galleryView = new GalleryView((id) => {
+    const product = productsModel.getItem(id);
+    if (!product) {
+        return;
+    }
 
-buyerModel.setAddress('Москва');
-console.log('Ошибки после указания адреса:', buyerModel.validate());
+    productsModel.setSelected(product);
+    const previewCard = new CardPreview((productId, action) => {
+        if (action !== 'toggle') {
+            return;
+        }
 
-buyerModel.setEmail('buyer@example.com');
-console.log('Ошибки после указания емэйла:', buyerModel.validate());
+        const item = productsModel.getItem(productId);
+        if (!item) {
+            return;
+        }
 
-buyerModel.setPhone('+79990000000');
-console.log('Данные покупателя:', buyerModel.getData());
-console.log('Ошибки валидации заполненных данных:', buyerModel.validate());
+        if (basketModel.hasItem(item.id)) {
+            basketModel.removeItem(item);
+        } else {
+            basketModel.addItem(item);
+        }
 
-buyerModel.clear();
-console.log('Данные покупателя после очистки:', buyerModel.getData());
-console.log('Ошибки валидации после очистки:', buyerModel.validate());
+        const selected = productsModel.getSelected();
+        if (selected) {
+            modalView.open(previewCard.render({ product: selected, isInBasket: basketModel.hasItem(selected.id) }));
+        }
+    });
 
-const webLarekApi = new LarekApi(new Api(API_URL));
-webLarekApi.getProducts()
-    .then((products) => {
-        productsModel.setItems(products.items);
-        console.log('Каталог, полученный с сервера:', productsModel.getItems());
+    modalView.open(previewCard.render({ product, isInBasket: basketModel.hasItem(product.id) }));
+});
+
+const basketView = new BasketView(
+    (id) => {
+        const product = productsModel.getItem(id);
+        if (product) {
+            basketModel.removeItem(product);
+            modalView.open(
+                basketView.render({
+                    items: basketModel.getItems(),
+                    total: basketModel.getTotalPrice(),
+                }),
+            );
+        }
+    },
+    () => {
+        const orderForm = new OrderForm((orderData) => {
+            buyerModel.setData({
+                payment: orderData.payment,
+                address: orderData.address ?? '',
+            });
+
+            const contactsForm = new ContactsForm((contactData) => {
+                buyerModel.setData(contactData);
+                const orderDataForServer = {
+                    payment: buyerModel.getData().payment ?? 'card',
+                    email: buyerModel.getData().email,
+                    phone: buyerModel.getData().phone,
+                    address: buyerModel.getData().address,
+                    items: basketModel.getItems().map((item) => item.id),
+                    total: basketModel.getTotalPrice(),
+                };
+
+                api.createOrder(orderDataForServer)
+                    .then((result) => {
+                        const success = cloneTemplate<HTMLDivElement>('#success');
+                        const description = ensureElement<HTMLElement>('.order-success__description', success);
+                        description.textContent = `Списано ${result.total} синапсов`;
+                        basketModel.clear();
+                        buyerModel.clear();
+                        modalView.open(success);
+                    })
+                    .catch((error) => {
+                        console.error('Ошибка оформления заказа:', error);
+                    });
+            });
+
+            modalView.open(contactsForm.render({
+                email: buyerModel.getData().email,
+                phone: buyerModel.getData().phone,
+            }));
+        });
+
+        modalView.open(orderForm.render({
+            payment: buyerModel.getData().payment,
+            address: buyerModel.getData().address,
+        }));
+    },
+);
+
+basketButton.addEventListener('click', () => {
+    basketButton.setAttribute('aria-expanded', 'true');
+    modalView.open(basketView.render({
+        items: basketModel.getItems(),
+        total: basketModel.getTotalPrice(),
+    }));
+});
+
+productsModel.on('products:changed', () => {
+    galleryView.render(productsModel.getItems());
+});
+
+basketModel.on('basket:changed', () => {
+    basketCounter.textContent = String(basketModel.getCount());
+    if (basketModel.getCount() === 0) {
+        basketCounter.textContent = '0';
+    }
+});
+
+api.getProducts()
+    .then((response) => {
+        productsModel.setItems(response.items);
     })
-    .catch((error) => console.error('Ошибка получения каталога:', error));
+    .catch((error) => {
+        console.error('Ошибка получения каталога:', error);
+    });
+
+const initialProducts: IProduct[] = [];
+galleryView.render(initialProducts);
+

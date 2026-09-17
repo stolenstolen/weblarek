@@ -28,7 +28,7 @@ const api = new LarekApi(new Api(API_URL));
 const modalView = new ModalView();
 const headerView = new HeaderView(() => events.emit('basket:open'));
 headerView.render();
-const successView = new SuccessView(() => modalView.close());
+const successView = new SuccessView(() => events.emit('success:close'));
 const previewCard = new CardPreview(() => events.emit('preview-toggle'));
 
 const handleCatalogSelection = (id: string): void => {
@@ -87,7 +87,14 @@ const handleBuyerFieldChange = (field: string, value: string): void => {
     }
 };
 
-const contactsForm = new ContactsForm(() => {
+const contactsForm = new ContactsForm(
+    () => events.emit('contacts:submit'),
+    (field, value) => events.emit('buyer:change', { field, value }),
+);
+
+events.on('success:close', () => modalView.close());
+
+events.on('contacts:submit', () => {
     const orderDataForServer = {
         payment: buyerModel.getData().payment ?? 'card',
         email: buyerModel.getData().email,
@@ -107,11 +114,20 @@ const contactsForm = new ContactsForm(() => {
         .catch((error) => {
             console.error('Ошибка оформления заказа:', error);
         });
-}, handleBuyerFieldChange);
+});
 
-const orderForm = new OrderForm(() => {
+const orderForm = new OrderForm(
+    () => events.emit('order:submit'),
+    (field, value) => events.emit('buyer:change', { field, value }),
+);
+
+events.on('order:submit', () => {
     modalView.open(contactsForm.render());
-}, handleBuyerFieldChange);
+});
+
+events.on<{ field: string; value: string }>('buyer:change', ({ field, value }) => {
+    handleBuyerFieldChange(field, value);
+});
 
 buyerModel.on('buyer:changed', () => {
     const data = buyerModel.getData();
@@ -138,7 +154,9 @@ buyerModel.on('buyer:changed', () => {
     contactsForm.setValid(!errors.email && !errors.phone);
 });
 
-const basketView = new BasketView(() => {
+const basketView = new BasketView(() => events.emit('basket:checkout'));
+
+events.on('basket:checkout', () => {
     modalView.open(orderForm.render());
 });
 

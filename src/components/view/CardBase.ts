@@ -20,6 +20,6 @@ export abstract class CardBase<T = IProduct> extends Component<T> {
     }
 
     protected formatPrice(price: number | null): string {
-        return price === null ? 'Недоступно' : `${price} синапсов`;
+        return price === null ? 'Бесценно' : `${price} синапсов`;
     }
 }
